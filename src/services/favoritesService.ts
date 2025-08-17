@@ -114,7 +114,13 @@ class FavoritesService {
     }
   }
 
-  async addToFavorites(anime: { id: string | number; title: string; image: string }): Promise<boolean> {
+  async addToFavorites(anime: { 
+    id: string | number; 
+    title: string; 
+    image: string;
+    rating?: number;
+    year?: number;
+  }): Promise<boolean> {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Не авторизован');
 
