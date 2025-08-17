@@ -1,12 +1,11 @@
 import { animeVostApi } from './animeVostApi';
-import * as backendApi from './backendApi';
 
 export interface WatchStatus {
   animeId: string;
   status: 'planned' | 'watching' | 'completed' | 'dropped';
   episodes: number;
-  title: string;  // Сделаем обязательным
-  image_url: string;  // Сделаем обязательным
+  title: string;
+  image_url: string;
 }
 
 export interface AnimeResponse {
@@ -26,6 +25,7 @@ export interface AnimeResponse {
   popularity?: number;
   updatedAt?: string;
   isFavorite?: boolean;
+  episodes_list?: { std: string; hd: string; number: number; name: string; }[];
 }
 
 export interface SearchResult {
@@ -118,8 +118,29 @@ class AnimeAPI {
     }
   }
 
-  async getAnimeById(id: string) {
-    return await animeVostApi.getAnimeById(id);
+  async getAnimeById(id: string): Promise<AnimeResponse | null> {
+    try {
+      console.log('Getting anime details for id:', id);
+      const animeVostDetails = await animeVostApi.getAnimeById(id);
+      console.log('Received anime details:', animeVostDetails);
+      if (!animeVostDetails) return null;
+
+      return {
+        id: animeVostDetails.id,
+        title: animeVostDetails.title,
+        image: animeVostDetails.image,
+        rating: parseFloat(animeVostDetails.rating) || 0,
+        year: parseInt(animeVostDetails.year) || undefined,
+        status: animeVostDetails.status,
+        description: animeVostDetails.description,
+        episodes: parseInt(animeVostDetails.episodes_count) || 0,
+        type: 'tv',
+        episodes_list: animeVostDetails.episodes_list || []
+      };
+    } catch (error) {
+      console.error('Error getting anime by id:', error);
+      return null;
+    }
   }
 
   async getLatestAnime(page = 1) {

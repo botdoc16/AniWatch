@@ -47,7 +47,7 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
   const { toast } = useToast();
 
   const [currentEpisode, setCurrentEpisode] = useState(1);
-  const [episodes, setEpisodes] = useState<{ std: string; hd: string; }[]>([]);
+  const [episodes, setEpisodes] = useState<{ std: string; hd: string; number: number; name: string; }[]>([]);
   const [quality, setQuality] = useState<'std' | 'hd'>('hd');
   const [isWatched, setIsWatched] = useState(false);
   const [watchProgress, setWatchProgress] = useState<WatchProgress | null>(null);
@@ -57,7 +57,7 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  const formatTime = useCallback((time: number) => {
+  const formatTime = useCallback((time: number): string => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -145,12 +145,15 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
 
   const handleEpisodeChange = useCallback((value: string) => {
     const newEpisode = Number(value);
-    if (newEpisode !== currentEpisode) {
-      updateWatchProgress().then(() => {
-        setCurrentEpisode(newEpisode);
-      });
+    if (newEpisode !== currentEpisode && newEpisode > 0 && newEpisode <= totalEpisodes) {
+      setCurrentEpisode(newEpisode);
+      if (videoRef.current && episodes[newEpisode - 1]) {
+        videoRef.current.src = episodes[newEpisode - 1][quality];
+        videoRef.current.load();
+        videoRef.current.play();
+      }
     }
-  }, [currentEpisode, updateWatchProgress]);
+  }, [currentEpisode, episodes, quality, totalEpisodes]);
 
   const handlePreviousEpisode = useCallback(async () => {
     if (currentEpisode > 1) {
@@ -205,20 +208,43 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
       try {
         const animeDetails = await animeApi.getAnimeById(animeId);
         if (animeDetails?.episodes_list) {
+          console.log('Loaded episodes:', animeDetails.episodes_list);
           setEpisodes(animeDetails.episodes_list);
+        } else {
+          console.error('No episodes found in anime details:', animeDetails);
+          toast({
+            title: "Ошибка загрузки серий",
+            description: "Не удалось получить список серий",
+            variant: "destructive",
+          });
         }
       } catch (error) {
         console.error('Error loading episodes:', error);
+        toast({
+          title: "Ошибка загрузки серий",
+          description: "Произошла ошибка при загрузке списка серий",
+          variant: "destructive",
+        });
       }
     };
 
     loadEpisodes();
-  }, [animeId]);
+  }, [animeId, toast]);
 
   useEffect(() => {
+    console.log('Current episode:', currentEpisode);
+    console.log('Episodes array:', episodes);
+    console.log('Current quality:', quality);
     if (videoRef.current && episodes[currentEpisode - 1]) {
-      videoRef.current.src = episodes[currentEpisode - 1][quality];
+      const source = episodes[currentEpisode - 1][quality];
+      console.log('Setting video source to:', source);
+      videoRef.current.src = source;
       videoRef.current.load();
+    } else {
+      console.log('Cannot set video source:', {
+        hasVideoRef: !!videoRef.current,
+        hasEpisode: !!episodes[currentEpisode - 1]
+      });
     }
   }, [currentEpisode, episodes, quality]);
 
@@ -257,7 +283,7 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('ended', handleVideoEnded);
     };
-  }, []);
+  }, [handleTimeUpdate, handleVideoEnded]);
 
   return (
     <div className="w-full max-w-5xl mx-auto">
@@ -280,6 +306,52 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
           </div>
         </div>
       )}
+
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <Select value={String(currentEpisode)} onValueChange={handleEpisodeChange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Выберите серию" />
+            </SelectTrigger>
+            <SelectContent>
+              {episodes.map((episode) => (
+                <SelectItem key={episode.number} value={String(episode.number)}>
+                  Серия {episode.number} - {episode.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleEpisodeChange(String(currentEpisode - 1))}
+              disabled={currentEpisode <= 1}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleEpisodeChange(String(currentEpisode + 1))}
+              disabled={currentEpisode >= totalEpisodes}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        <Select value={quality} onValueChange={(value) => setQuality(value as 'std' | 'hd')}>
+          <SelectTrigger className="w-[100px]">
+            <SelectValue placeholder="Качество" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="hd">HD</SelectItem>
+            <SelectItem value="std">SD</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden group">
         <video
@@ -358,9 +430,9 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
                   <SelectValue placeholder={`Эпизод ${currentEpisode}`} />
                 </SelectTrigger>
                 <SelectContent className="max-h-[40vh]">
-                  {Array.from({ length: totalEpisodes }, (_, i) => (
-                    <SelectItem key={i + 1} value={(i + 1).toString()}>
-                      Эпизод {i + 1}
+                  {episodes.map((episode) => (
+                    <SelectItem key={episode.number} value={episode.number.toString()}>
+                      Эпизод {episode.number} - {episode.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

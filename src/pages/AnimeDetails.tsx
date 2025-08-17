@@ -49,8 +49,19 @@ const AnimeDetails = () => {
           setIsLoading(true);
           setError(null);
           const details = await animeApi.getAnimeById(id);
+          console.log('Received anime details:', details);
           if (details) {
-            setAnime(details);
+            setAnime({
+              id: details.id,
+              title: details.title,
+              description: details.description || '',
+              image: details.image,
+              episodes_count: String(details.episodes || '0'),
+              status: details.status || 'Неизвестно',
+              year: String(details.year || ''),
+              genre: details.genres?.join(', ') || '',
+              rating: String(details.rating || '0')
+            });
           } else {
             setError('Аниме не найдено');
           }
@@ -188,11 +199,13 @@ const AnimeDetails = () => {
             <div className="mb-6">
               <h2 className="text-xl font-semibold mb-2">Жанры</h2>
               <div className="flex flex-wrap gap-2">
-                {anime.genre.split(', ').map((genre) => (
+                {anime.genre ? anime.genre.split(', ').map((genre) => (
                   <Badge key={genre} variant="outline">
                     {genre}
                   </Badge>
-                ))}
+                )) : (
+                  <Badge variant="outline">Жанр не указан</Badge>
+                )}
               </div>
             </div>
 
