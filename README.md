@@ -30,11 +30,7 @@ npm run dev
 
 > ⚠️ Requires **Node.js** and **npm** installed.
 
----
 
-## 🌍 Live Preview
-
-🔗 [Open Project](https://lovable.dev/projects/5faeb625-cb82-4e0c-8dba-4a074dd43949)
 
 ---
 
