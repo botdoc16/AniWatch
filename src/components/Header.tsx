@@ -23,7 +23,7 @@ export function Header({ onSearch, searchLoading }: HeaderProps) {
         <div className="hidden md:flex mr-4">
           <Link to="/" className="mr-6 flex items-center space-x-2">
             <span className="hidden font-bold sm:inline-block">
-              AniDoc
+              AniWatch
             </span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
