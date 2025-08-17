@@ -33,7 +33,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'development' &&
     ViteImageOptimizer({
       jpg: {
         quality: 80,
