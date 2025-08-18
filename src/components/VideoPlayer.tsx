@@ -21,6 +21,7 @@ interface VideoPlayerProps {
   title: string;
   totalEpisodes: number;
   imageUrl: string;
+  onExpand?: () => void;
 }
 
 interface EpisodeProgress {
@@ -40,8 +41,10 @@ interface WatchProgress {
   status: 'watching' | 'completed';
 }
 
-export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPlayerProps): JSX.Element => {
+export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl, onExpand }: VideoPlayerProps): JSX.Element => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { toast } = useToast();
@@ -56,6 +59,90 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekValue, setSeekValue] = useState(0); // 0-100
+  const wasPlayingRef = useRef<boolean>(false);
+
+  // Pointer move/up handlers need stable references for add/removeEventListener
+  const handlePointerMove = useCallback((e: any) => {
+    if (!isSeeking) return;
+    const video = videoRef.current;
+    const track = trackRef.current;
+    if (!track || !video) return;
+
+    let clientX: number | undefined;
+    if (e && typeof e.clientX === 'number') clientX = e.clientX;
+    else if (e && e.touches && e.touches[0]) clientX = e.touches[0].clientX;
+    if (clientX === undefined) return;
+
+  const rect = track.getBoundingClientRect();
+  const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const durationSafe = video.duration || 1;
+  const time = durationSafe * percent;
+
+  // debug
+  // console.debug('pointerMove', { clientX, percent, time, duration: video.duration });
+
+  setSeekValue(percent * 100);
+  setCurrentTime(time);
+  video.currentTime = time;
+  }, [isSeeking]);
+
+  const handlePointerUp = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      const durationSafe = video.duration || 1;
+      const currentPercent = (video.currentTime / durationSafe) * 100;
+      const progress = video.currentTime / durationSafe;
+      // обновим состояние прогресса, чтобы рендер точно взял новое значение
+      setSeekValue(currentPercent);
+      setCurrentTime(video.currentTime);
+      setEpisodeProgress({
+        episodeId: `${animeId}_${currentEpisode}`,
+        episodeNumber: currentEpisode,
+        watchedPercentage: currentPercent,
+        progress,
+        isCompleted: progress > 0.9,
+      });
+      // debug
+      // console.debug('pointerUp', { currentTime: video.currentTime, duration: video.duration, currentPercent });
+
+      if (wasPlayingRef.current) video.play();
+    }
+    setIsSeeking(false);
+
+    window.removeEventListener('mousemove', handlePointerMove as any);
+    window.removeEventListener('mouseup', handlePointerUp as any);
+    window.removeEventListener('touchmove', handlePointerMove as any);
+    window.removeEventListener('touchend', handlePointerUp as any);
+    window.removeEventListener('pointermove', handlePointerMove as any);
+    window.removeEventListener('pointerup', handlePointerUp as any);
+  }, [handlePointerMove, animeId, currentEpisode]);
+
+  const handleTrackPointerDown = useCallback((clientX: number) => {
+    const video = videoRef.current;
+    const track = trackRef.current;
+    if (!track || !video) return;
+
+    wasPlayingRef.current = !video.paused;
+    video.pause();
+
+    const rect = track.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const time = (video.duration || 0) * percent;
+
+    setSeekValue(percent * 100);
+    setCurrentTime(time);
+    video.currentTime = time;
+    setIsSeeking(true);
+
+    window.addEventListener('mousemove', handlePointerMove as any);
+    window.addEventListener('mouseup', handlePointerUp as any);
+    window.addEventListener('touchmove', handlePointerMove as any, { passive: false } as any);
+    window.addEventListener('touchend', handlePointerUp as any);
+    window.addEventListener('pointermove', handlePointerMove as any);
+    window.addEventListener('pointerup', handlePointerUp as any);
+  }, [handlePointerMove, handlePointerUp]);
 
   const formatTime = useCallback((time: number): string => {
     const minutes = Math.floor(time / 60);
@@ -126,22 +213,25 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
   const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
+    if (!isSeeking) {
+      setCurrentTime(video.currentTime);
+      const progress = video.currentTime / (video.duration || 1);
 
-    setCurrentTime(video.currentTime);
-    const progress = video.currentTime / video.duration;
+      setSeekValue(progress * 100);
 
-    setEpisodeProgress({
-      episodeId: `${animeId}_${currentEpisode}`,
-      episodeNumber: currentEpisode,
-      watchedPercentage: progress * 100,
-      progress,
-      isCompleted: progress > 0.9
-    });
+      setEpisodeProgress({
+        episodeId: `${animeId}_${currentEpisode}`,
+        episodeNumber: currentEpisode,
+        watchedPercentage: progress * 100,
+        progress,
+        isCompleted: progress > 0.9
+      });
 
-    if (progress > 0.9 && user && !episodeProgress?.isCompleted) {
-      updateWatchProgress();
+      if (progress > 0.9 && user && !episodeProgress?.isCompleted) {
+        updateWatchProgress();
+      }
     }
-  }, [animeId, currentEpisode, user, episodeProgress, updateWatchProgress]);
+  }, [animeId, currentEpisode, user, updateWatchProgress, isSeeking]);
 
   const handleEpisodeChange = useCallback((value: string) => {
     const newEpisode = Number(value);
@@ -193,15 +283,25 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
   }, []);
 
   const toggleFullscreen = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    // Если передан обработчик onExpand — используем его (переход на страницу с плеером),
+    // иначе выполняем стандартный fullscreen на контейнере плеера, чтобы сохранить оверлеи/контролы.
+    if (onExpand) {
+      onExpand();
+      return;
+    }
+
+    const elem: Element | null = containerRef.current || videoRef.current;
+    if (!elem) return;
 
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
-      video.requestFullscreen();
+      // requestFullscreen существует на Element; используем его безопасно
+      if (typeof (elem as any).requestFullscreen === 'function') {
+        (elem as any).requestFullscreen();
+      }
     }
-  }, []);
+  }, [onExpand]);
 
   useEffect(() => {
     const loadEpisodes = async () => {
@@ -307,53 +407,9 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <Select value={String(currentEpisode)} onValueChange={handleEpisodeChange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Выберите серию" />
-            </SelectTrigger>
-            <SelectContent>
-              {episodes.map((episode) => (
-                <SelectItem key={episode.number} value={String(episode.number)}>
-                  Серия {episode.number} - {episode.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+  {/* Верхняя панель с переключением эпизодов и качеством удалена по запросу */}
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleEpisodeChange(String(currentEpisode - 1))}
-              disabled={currentEpisode <= 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleEpisodeChange(String(currentEpisode + 1))}
-              disabled={currentEpisode >= totalEpisodes}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        <Select value={quality} onValueChange={(value) => setQuality(value as 'std' | 'hd')}>
-          <SelectTrigger className="w-[100px]">
-            <SelectValue placeholder="Качество" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hd">HD</SelectItem>
-            <SelectItem value="std">SD</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden group">
+  <div ref={containerRef} className="relative aspect-video bg-black rounded-lg overflow-hidden group">
         <video
           ref={videoRef}
           className="w-full h-full"
@@ -405,10 +461,63 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl }: VideoPl
           </Button>
 
           <div className="absolute bottom-16 left-0 right-0 px-4">
-            <div className="w-full bg-white/30 rounded-full h-1">
+            <div
+              ref={trackRef}
+              onMouseDown={(e) => handleTrackPointerDown(e.clientX)}
+              onTouchStart={(e) => {
+                if (e.touches && e.touches.length) handleTrackPointerDown(e.touches[0].clientX);
+              }}
+              onPointerDown={(e: React.PointerEvent) => handleTrackPointerDown(e.clientX)}
+              className="relative w-full bg-white/30 rounded-full h-1 cursor-pointer"
+              style={{ touchAction: 'none' }}
+            >
               <div
                 className="bg-primary h-1 rounded-full transition-all"
-                style={{ width: `${(episodeProgress?.progress || 0) * 100}%` }}
+                style={{ width: `${(isSeeking ? seekValue : (episodeProgress?.progress || 0) * 100)}%` }}
+              />
+
+              {/* Thumb */}
+              <div
+                role="slider"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(isSeeking ? seekValue : (episodeProgress?.progress || 0) * 100)}
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  handleTrackPointerDown(e.clientX);
+                }}
+                onPointerMove={(e) => {
+                  if (isSeeking) {
+                    e.preventDefault();
+                    const track = trackRef.current;
+                    const video = videoRef.current;
+                    if (!track || !video) return;
+                    
+                    const rect = track.getBoundingClientRect();
+                    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    const time = video.duration * percent;
+                    
+                    setSeekValue(percent * 100);
+                    setCurrentTime(time);
+                    video.currentTime = time;
+                  }
+                }}
+                onPointerUp={(e) => {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+                  handlePointerUp();
+                }}
+                className="absolute top-1/2 -translate-y-1/2 bg-white shadow-md w-4 h-4 rounded-full cursor-pointer hover:scale-125 transition-transform"
+                style={{ 
+                  left: `calc(${(isSeeking ? seekValue : (episodeProgress?.progress || 0) * 100)}% - 8px)`,
+                  touchAction: 'none',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  cursor: 'grab',
+                  zIndex: 10
+                }}
               />
             </div>
           </div>

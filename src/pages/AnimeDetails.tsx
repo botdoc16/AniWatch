@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { VideoPlayer } from '@/components/VideoPlayer';
 import { useEffect, useState } from 'react';
 import { animeApi } from '@/services/animeApi';
@@ -30,6 +30,9 @@ const AnimeDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const shouldShowPlayerInline = queryParams.get('player') === '1';
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
@@ -132,6 +135,20 @@ const AnimeDetails = () => {
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
+        {shouldShowPlayerInline && (
+          <div className="mb-8">
+            <VideoPlayer
+              animeId={anime.id}
+              title={anime.title}
+              totalEpisodes={(() => {
+                if (!anime.episodes_count) return 0;
+                const match = anime.episodes_count.match(/\d+/);
+                return match ? parseInt(match[0]) : 0;
+              })()}
+              imageUrl={anime.image}
+            />
+          </div>
+        )}
         <div className="flex justify-center items-center min-h-[400px]">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
         </div>

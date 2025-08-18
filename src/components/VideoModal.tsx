@@ -34,7 +34,7 @@ export function VideoModal({
         <DialogDescription className="sr-only">
           {`Просмотр аниме ${title}, всего серий: ${totalEpisodes}`}
         </DialogDescription>
-        <VideoPlayer
+  <VideoPlayer
           animeId={animeId}
           title={title}
           totalEpisodes={totalEpisodes}
