@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import Index from "./pages/Index";
@@ -22,7 +22,7 @@ function App() {
   return (
     <div className="min-h-screen bg-background text-foreground antialiased transition-colors duration-300">
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+  <HashRouter>
           <TooltipProvider>
             <AuthProvider>
               <Routes>
@@ -37,7 +37,7 @@ function App() {
               <Sonner />
             </AuthProvider>
           </TooltipProvider>
-        </BrowserRouter>
+  </HashRouter>
       </QueryClientProvider>
     </div>
   );
