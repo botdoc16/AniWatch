@@ -548,7 +548,7 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl, onExpand 
               </Select>
 
               <span className="text-white text-sm">
-                из {totalEpisodes}
+                из {episodes.length > 0 ? episodes.length : totalEpisodes}
               </span>
             </div>
 

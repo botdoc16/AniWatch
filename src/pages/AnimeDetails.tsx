@@ -54,16 +54,27 @@ const AnimeDetails = () => {
           const details = await animeApi.getAnimeById(id);
           console.log('Received anime details:', details);
           if (details) {
+            // Если details.episodes равен 0, но есть подробный список серий, используем длину списка
+            const episodesCount = (typeof details.episodes === 'number' && details.episodes > 0)
+              ? details.episodes
+              : (details.episodes_list && details.episodes_list.length > 0 ? details.episodes_list.length : 0);
+
             setAnime({
               id: details.id,
               title: details.title,
               description: details.description || '',
               image: details.image,
-              episodes_count: String(details.episodes || '0'),
+              episodes_count: String(episodesCount),
               status: details.status || 'Неизвестно',
               year: String(details.year || ''),
               genre: details.genres?.join(', ') || '',
               rating: String(details.rating || '0')
+            });
+            console.debug('Set anime state:', {
+              id: details.id,
+              episodes_count: String(episodesCount),
+              episodes_list_length: details.episodes_list ? details.episodes_list.length : 0,
+              episodes_field: details.episodes
             });
           } else {
             setError('Аниме не найдено');
