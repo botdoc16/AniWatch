@@ -24,6 +24,7 @@ export interface User {
 export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -43,17 +44,33 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("user");
-    if (token && savedUser) {
-      const userData = JSON.parse(savedUser);
-      setUser(userData);
-      setIsAuthenticated(true);
-      updateUserData();
-    }
+    const initAuth = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        const savedUser = localStorage.getItem("user");
+        if (token && savedUser) {
+          const userData = JSON.parse(savedUser);
+          setUser(userData);
+          setIsAuthenticated(true);
+          await updateUserData();
+        }
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setUser(null);
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void initAuth();
   }, []);
 
   const updateUserData = async () => {
@@ -218,30 +235,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem("token");
-      const savedUser = localStorage.getItem("user");
-      if (token && savedUser && !isAuthenticated) {
-        try {
-          const userData = JSON.parse(savedUser);
-          setUser(userData);
-          setIsAuthenticated(true);
-          await updateUserData();
-        } catch (error) {
-          console.error('Ошибка проверки аутентификации:', error);
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-      }
+      // Этот эффект может срабатывать при изменении isAuthenticated из других мест.
+      // Мы не хотим снова блокировать UI, поэтому оставляем реализацию пустой.
+      return;
     };
-
     void checkAuth();
   }, [isAuthenticated, updateUserData]);
 
   const value: AuthContextType = {
     user,
     isAuthenticated,
+  isLoading,
     login,
     logout,
     register,

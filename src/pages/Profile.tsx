@@ -40,7 +40,7 @@ interface InProgressAnime {
 }
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [favorites, setFavorites] = useState<FavoriteAnime[]>([]);
   const [watchedAnime, setWatchedAnime] = useState<WatchedAnime[]>([]);
@@ -50,6 +50,9 @@ export default function Profile() {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Если auth еще загружается — не делаем редирект
+    if (isAuthLoading) return;
+
     if (!user) {
       navigate('/');
       return;
@@ -57,7 +60,7 @@ export default function Profile() {
 
     void loadUserData();
     void loadFavorites();
-  }, [user, navigate]);
+  }, [user, isAuthLoading, navigate]);
 
   const loadUserData = async () => {
     try {

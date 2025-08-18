@@ -134,7 +134,6 @@ export default function Favorites() {
                 {fav.rating && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <span>★ {fav.rating}</span>
-                    {fav.year && <span>• {fav.year}</span>}
                   </div>
                 )}
               </div>
