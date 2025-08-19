@@ -259,6 +259,12 @@ class AnimeAPI {
         });
 
         if (!response.ok) {
+          // Если endpoint не найден или пользователь не авторизован — возвращаем пустой список и логируем предупреждение.
+          if (response.status === 404 || response.status === 401) {
+            const errorText = await response.text().catch(() => '');
+            console.warn('Watched anime endpoint returned', response.status, { errorText });
+            return [];
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -317,6 +323,11 @@ class AnimeAPI {
         });
 
         if (!response.ok) {
+          if (response.status === 404 || response.status === 401) {
+            const errorText = await response.text().catch(() => '');
+            console.warn('In-progress anime endpoint returned', response.status, { errorText });
+            return [];
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 

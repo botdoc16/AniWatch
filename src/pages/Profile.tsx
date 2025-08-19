@@ -5,6 +5,7 @@ import { animeApi, AnimeResponse } from '@/services/animeApi';
 import { favoritesService, FavoriteAnime } from '@/services/favoritesService';
 import * as backendApi from '@/services/backendApi';
 import { Button } from '@/components/ui/button';
+import { Settings } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { UserProgress } from '@/components/UserProgress';
 import { Card } from '@/components/ui/card';
@@ -48,6 +49,17 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const handleBack = () => {
+    try {
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+    } catch (e) {
+      // ignore
+    }
+    navigate(-1);
+  };
 
   useEffect(() => {
     // Если auth еще загружается — не делаем редирект
@@ -195,33 +207,45 @@ export default function Profile() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-4">
+        <Button variant="ghost" size="sm" onClick={handleBack} aria-label="Назад">← Назад</Button>
+      </div>
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-6 mb-8">
           <div className="flex-shrink-0">
-            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-primary">
-                {user.username[0].toUpperCase()}
-              </span>
+            <div className="w-24 h-24 bg-primary/10 rounded-full overflow-hidden flex items-center justify-center">
+              {user.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.avatar} alt={user.username} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-2xl font-bold text-primary">
+                  {user.username[0].toUpperCase()}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="flex-grow">
-            <h1 className="text-2xl font-bold mb-2">{user.username}</h1>
-            <p className="text-muted-foreground">{user.email}</p>
-          </div>
+            <div className="flex-grow flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold mb-2">{user.username}</h1>
+                <p className="text-muted-foreground">{user.email}</p>
+              </div>
+
+              <div className="ml-4 flex items-center gap-3">
+                <UserProgress
+                  level={user.level || 1}
+                  exp={user.exp || 0}
+                  next_level_exp={user.next_level_exp || 1000}
+                  achievements={user.achievements}
+                />
+                <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} aria-label="Настройки">
+                  <Settings className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
         </div>
 
-        <div className="grid gap-6">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Прогресс</h2>
-            <UserProgress
-              level={user.level || 1}
-              exp={user.exp || 0}
-              next_level_exp={user.next_level_exp || 1000}
-              achievements={user.achievements}
-            />
-          </Card>
-
+  <div className="grid gap-6">
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Статистика просмотров</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

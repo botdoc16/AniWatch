@@ -29,6 +29,7 @@ export function UserProfileMenu() {
         <DropdownMenuItem asChild>
           <Link to="/favorites">Избранное</Link>
         </DropdownMenuItem>
+  {/* Настройки перемещены на страницу профиля (кнопка-шестерёнка) */}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout}>
           Выйти

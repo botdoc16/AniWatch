@@ -23,6 +23,17 @@ interface Filters {
 
 export default function Catalog() {
   const navigate = useNavigate();
+  const handleBack = () => {
+    try {
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+    } catch (e) {
+      // ignore
+    }
+    navigate(-1);
+  };
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -227,6 +238,9 @@ export default function Catalog() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-4">
+        <Button variant="ghost" size="sm" onClick={handleBack} aria-label="Назад">← Назад</Button>
+      </div>
       <div className="flex flex-col gap-6">
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row items-start md:items-center gap-4">

@@ -48,13 +48,7 @@ class FavoritesService {
     }
 
     try {
-      // Проверяем кэш
-      const cached = loadFromCache();
-      if (cached) {
-        favoritesCache = cached;
-        return cached;
-      }
-
+      // Сначала пытаемся получить актуальные данные с сервера (источник правды)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
 
@@ -70,8 +64,10 @@ class FavoritesService {
 
         if (!response.ok) {
           // В случае ошибки пробуем использовать кэш
-          if (favoritesCache) {
-            return favoritesCache;
+          const cached = loadFromCache();
+          if (cached) {
+            favoritesCache = cached;
+            return cached;
           }
           throw new Error(`Ошибка получения избранного: ${response.status} ${response.statusText}`);
         }
@@ -96,6 +92,7 @@ class FavoritesService {
       console.error('Ошибка при получении избранного:', error);
       const cached = loadFromCache();
       if (cached) {
+        favoritesCache = cached;
         return cached;
       }
       throw error;
@@ -151,9 +148,14 @@ class FavoritesService {
         throw new Error(`Ошибка добавления в избранное: ${response.status} ${response.statusText}`);
       }
 
-      // Инвалидируем кэш
-      favoritesCache = null;
-      localStorage.removeItem('cached_favorites');
+      // Обновим кэш, получив актуальный список с сервера
+      try {
+        await this.getFavorites();
+      } catch (e) {
+        // Если не удалось обновить кэш, инвалидируем локальную копию
+        favoritesCache = null;
+        localStorage.removeItem('cached_favorites');
+      }
 
       return true;
     } catch (error) {
@@ -193,9 +195,13 @@ class FavoritesService {
         throw new Error(`Ошибка удаления из избранного: ${response.status} ${response.statusText}`);
       }
 
-      // Инвалидируем кэш
-      favoritesCache = null;
-      localStorage.removeItem('cached_favorites');
+      // Обновим кэш, получив актуальный список с сервера
+      try {
+        await this.getFavorites();
+      } catch (e) {
+        favoritesCache = null;
+        localStorage.removeItem('cached_favorites');
+      }
 
       return true;
     } catch (error) {

@@ -29,6 +29,7 @@ export interface AuthContextType {
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserData: () => Promise<void>;
+  setUserLocal: (updates: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -107,31 +108,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Получаем все данные параллельно и обрабатываем их безопасно
+  // Получаем все данные параллельно и обрабатываем их безопасно
       const results = await Promise.allSettled([
         userLevelService.getUserLevel(),
         achievementsService.getUserAchievements(),
       ]);
 
-      if (user) {
-        const updatedUser = { ...user };
-        
+      // Use the saved user data from localStorage as the base (so updates made directly to localStorage
+      // in Settings.tsx are reflected immediately), then merge server-side info (level/achievements)
+      if (userData) {
+        const updatedUser = { ...(user || {}), ...userData } as any;
+
         // Проверяем результат получения уровня пользователя
         const levelResult = results[0];
-        if (levelResult.status === 'fulfilled') {
+        if (levelResult.status === 'fulfilled' && levelResult.value) {
           const levelData = levelResult.value;
           updatedUser.level = levelData.level;
           updatedUser.exp = levelData.exp;
           updatedUser.next_level_exp = levelData.next_level_exp;
+        } else {
+          console.warn('User level not updated (no data returned)');
         }
-        
+
         // Проверяем результат получения достижений
         const achievementsResult = results[1];
         if (achievementsResult.status === 'fulfilled') {
           updatedUser.achievements = achievementsResult.value;
         }
 
-        setUser(updatedUser);
+        setUser(updatedUser as any);
+        try {
+          // Persist updated user data (including level/exp) so reloads keep the latest values
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        } catch (e) {
+          console.warn('Failed to persist updated user to localStorage', e);
+        }
+      }
+
+      // Синхронизируем избранное с бэкендом — это сохранит favorites в кэше/localStorage
+      try {
+        await favoritesService.getFavorites();
+      } catch (e) {
+        console.warn('Failed to sync favorites from server', e);
+      }
+
+      // Попробуем получить свежий профиль (аватар и возможные обновления username/email)
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || 'https://api.aniwatch.lol';
+        const profile = await (await import('@/services/backendApi')).getUser(userData.user_id);
+        if (profile) {
+          const rawAvatar = profile.avatar_url;
+          const avatarFull = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${apiUrl}${rawAvatar}`) : undefined;
+          // apply to local saved user so UI updates
+          try {
+            const saved = localStorage.getItem('user');
+            const parsed = saved ? JSON.parse(saved) : {};
+            const merged = {
+              ...parsed,
+              username: profile.username || parsed.username,
+              email: profile.email || parsed.email,
+              avatar: avatarFull || parsed.avatar
+            };
+            localStorage.setItem('user', JSON.stringify(merged));
+            setUser(merged as any);
+          } catch (e) {
+            console.warn('Failed to merge profile into local user', e);
+          }
+        }
+      } catch (e) {
+        // Не критично если не удалось
       }
     } catch (error: any) {
       if (error?.message?.includes("User not found")) {
@@ -148,6 +193,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: error instanceof Error ? error.message : "Не удалось обновить данные пользователя",
         variant: "destructive",
       });
+    }
+  };
+
+  const setUserLocal = (updates: Partial<User>) => {
+    try {
+      const saved = localStorage.getItem('user');
+      const base = saved ? JSON.parse(saved) : (user ? user : {});
+      const merged = { ...base, ...(updates || {}) } as User;
+      setUser(merged);
+      try {
+        localStorage.setItem('user', JSON.stringify(merged));
+      } catch (e) {
+        console.warn('Failed to persist user to localStorage in setUserLocal', e);
+      }
+    } catch (e) {
+      console.warn('setUserLocal error', e);
     }
   };
 
@@ -172,6 +233,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         favoritesService.setUserId(userData.user_id);
         setUser(userData);
         setIsAuthenticated(true);
+        // Синхронизируем дополнительные данные (уровень, достижения, избранное)
+        try {
+          await updateUserData();
+        } catch (e) {
+          console.warn('Failed to update user data after login', e);
+        }
       }
     } catch (error: any) {
       toast({
@@ -204,6 +271,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         favoritesService.setUserId(userData.user_id);
         setUser(userData);
         setIsAuthenticated(true);
+        // Синхронизируем дополнительные данные (уровень, достижения, избранное)
+        try {
+          await updateUserData();
+        } catch (e) {
+          console.warn('Failed to update user data after register', e);
+        }
       }
     } catch (error: any) {
       toast({
@@ -250,6 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     register,
     updateUserData
+  ,setUserLocal
   };
 
   return (

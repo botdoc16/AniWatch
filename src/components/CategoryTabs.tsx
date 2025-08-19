@@ -19,7 +19,9 @@ export function CategoryTabs({ categories, activeCategory, onSelect }: CategoryT
         return (
           <button
             key={category.value}
+            type="button"
             onClick={() => onSelect(category.value)}
+            aria-pressed={activeCategory === category.value}
             className={cn(
               "category-button",
               "flex items-center gap-2",

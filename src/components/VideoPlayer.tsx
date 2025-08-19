@@ -45,7 +45,7 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl, onExpand 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+  const { user, updateUserData } = useAuth();
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
@@ -195,7 +195,28 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl, onExpand 
         variant: isLastEpisode ? "default" : "default",
       });
 
-      await userLevelService.watchEpisode(user.user_id);
+      try {
+        const levelResult = await userLevelService.watchEpisode(user.user_id);
+        if (!levelResult) {
+          toast({
+            title: 'Не удалось обновить уровень',
+            description: 'Сервер не ответил об успешном обновлении уровня',
+            variant: 'destructive',
+          });
+        } else {
+          // Обновим данные пользователя в контексте, чтобы отразить новый уровень/опыт
+          if (typeof updateUserData === 'function') {
+            await updateUserData();
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to update user level after watching episode', err);
+        toast({
+          title: 'Ошибка обновления уровня',
+          description: err instanceof Error ? err.message : 'Не удалось обновить уровень пользователя',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
       console.error('Error updating watch progress:', error);
       let errorMessage = 'Не удалось сохранить прогресс просмотра';
@@ -386,7 +407,7 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl, onExpand 
   }, [handleTimeUpdate, handleVideoEnded]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
+  <div className="w-full max-w-5xl mx-auto min-h-screen flex items-center justify-center p-4 sm:p-0 sm:min-h-0 sm:block">
       {watchProgress && (
         <div className="mb-4 p-4 bg-secondary/10 rounded-lg">
           <div className="flex items-center justify-between">
@@ -415,7 +436,6 @@ export const VideoPlayer = ({ animeId, title, totalEpisodes, imageUrl, onExpand 
           className="w-full h-full"
           controls={false}
           autoPlay
-          onEnded={handleVideoEnded}
         />
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">

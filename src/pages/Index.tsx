@@ -32,17 +32,12 @@ const Index = () => {
   const [activeCategory, setActiveCategory] = useState("popular");
   const { toast } = useToast();
 
-  // Загружаем популярные аниме при загрузке страницы
+  // Загружаем/обновляем список при смене категории или изменении авторизации
   useEffect(() => {
-    loadPopularAnime(1, false);
-  }, []);
+    loadPopularAnime(1, false, activeCategory);
+  }, [activeCategory, user]);
 
-  // Обновляем списки когда пользователь авторизуется/выходит
-  useEffect(() => {
-    loadPopularAnime(1, false);
-  }, [user]);
-
-  const loadPopularAnime = async (page: number = 1, isLoadingMore: boolean = false) => {
+  const loadPopularAnime = async (page: number = 1, isLoadingMore: boolean = false, category: string = 'popular') => {
     try {
       if (isLoadingMore) {
         setLoadingMore(true);
@@ -50,8 +45,8 @@ const Index = () => {
         setLoading(true);
       }
 
-      const result = await animeApi.getPopularAnime(page);
-      let animesWithFavorites = result.animes;
+  const result = await animeApi.getPopularAnime(page);
+  let animesWithFavorites = result.animes;
 
       if (user) {
         try {
@@ -70,10 +65,31 @@ const Index = () => {
         }
       }
 
+      // Client-side filtering / sorting depending on selected category
+      const filterByCategory = (list: typeof animesWithFavorites) => {
+        switch (category) {
+          case 'top':
+            return [...list].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+          case 'recent':
+            return [...list].sort((a, b) => (b.year || 0) - (a.year || 0));
+          case 'ongoing':
+            return list.filter(a => {
+              const status = (a.status || '').toLowerCase();
+              return status.includes('ongo') || status.includes('air') || status.includes('онго');
+            });
+          case 'popular':
+          default:
+            // try to use popularity, fallback to rating
+            return [...list].sort((a, b) => ((b.popularity as any || b.rating || 0) - (a.popularity as any || a.rating || 0)));
+        }
+      };
+
+      const finalList = filterByCategory(animesWithFavorites);
+
       if (isLoadingMore) {
-        setPopularAnimes(prev => [...prev, ...animesWithFavorites]);
+        setPopularAnimes(prev => [...prev, ...finalList]);
       } else {
-        setPopularAnimes(animesWithFavorites);
+        setPopularAnimes(finalList);
       }
 
       setHasNextPage(result.hasNextPage);
@@ -93,7 +109,7 @@ const Index = () => {
 
   const handleLoadMore = () => {
     if (!loadingMore && hasNextPage) {
-      loadPopularAnime(currentPage + 1, true);
+  loadPopularAnime(currentPage + 1, true, activeCategory);
     }
   };
 
@@ -255,7 +271,13 @@ const Index = () => {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
                 {categories.map(category => (
-                  <div key={category.value} className="group space-y-2 p-4 rounded-xl transition-all duration-300 hover:bg-primary/5">
+                  <button
+                    key={category.value}
+                    type="button"
+                    onClick={() => setActiveCategory(category.value)}
+                    aria-pressed={activeCategory === category.value}
+                    className="group space-y-2 p-4 rounded-xl transition-all duration-300 hover:bg-primary/5 focus:outline-none"
+                  >
                     <div className="w-12 h-12 mx-auto bg-primary/20 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
                       <category.icon className="w-6 h-6 text-primary" />
                     </div>
@@ -266,7 +288,7 @@ const Index = () => {
                       {category.value === 'recent' && 'Свежие релизы'}
                       {category.value === 'ongoing' && 'Текущие онгоинги'}
                     </p>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -280,7 +302,11 @@ const Index = () => {
               <h2 className="text-2xl md:text-3xl font-bold mb-2">
                 {isShowingSearchResults
                   ? `Результаты поиска: "${currentQuery}"`
-                  : "Популярные аниме"
+                  : activeCategory === 'popular' ? 'Популярные аниме'
+                  : activeCategory === 'top' ? 'Лучшие аниме'
+                  : activeCategory === 'recent' ? 'Недавние релизы'
+                  : activeCategory === 'ongoing' ? 'Текущие онгоинги'
+                  : 'Аниме'
                 }
               </h2>
               {!isShowingSearchResults && (

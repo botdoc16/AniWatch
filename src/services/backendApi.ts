@@ -257,10 +257,103 @@ export async function updateWatchProgress(data: WatchProgress): Promise<void> {
   }
 }
 
+export async function updateUserProfile(userId: string, payload: { username?: string; email?: string; avatar?: string }) {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('Не авторизован');
+  // First: try the JSON endpoint that exists on the backend: POST /user/{user_id}
+  try {
+    const response = await fetch(`${API_URL}/user/${userId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ username: payload.username, email: payload.email })
+    });
+
+    if (response.ok) {
+      try {
+        return await response.json();
+      } catch {
+        return null;
+      }
+    }
+
+    // If method not allowed or not found, fall through to form-based endpoint
+    if (response.status !== 404 && response.status !== 405) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || `Ошибка обновления профиля (status ${response.status})`);
+    }
+  } catch (err) {
+    // network error or other — continue to try form endpoint
+    console.warn('POST /user/{id} failed, will try form endpoint:', err);
+  }
+
+  // Fallback: try form endpoint that supports avatar upload: POST /update-profile/{user_id}
+  try {
+    const form = new FormData();
+    if (payload.username !== undefined) form.append('username', payload.username);
+    if (payload.email !== undefined) form.append('email', payload.email);
+
+    // If avatar is a File object (not a URL string), append it. Otherwise skip — backend expects UploadFile.
+    if (payload.avatar && typeof (payload.avatar) !== 'string' && (payload.avatar as any).name) {
+      form.append('avatar', payload.avatar as unknown as File);
+    }
+
+    const response = await fetch(`${API_URL}/update-profile/${userId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        // NOTE: don't set Content-Type for FormData — browser sets boundary
+        'Accept': 'application/json'
+      },
+      body: form
+    });
+
+    if (response.ok) {
+      try {
+        return await response.json();
+      } catch {
+        return null;
+      }
+    }
+
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || `Ошибка обновления профиля (status ${response.status})`);
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    throw error;
+  }
+}
+
+export async function getUser(userId: string) {
+  try {
+    const response = await fetch(`${API_URL}/user/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || `Ошибка получения пользователя (status ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    throw error;
+  }
+}
+
 export const backendApi = {
   login,
   register,
   logout,
   getUserWatchHistory,
   updateWatchProgress,
+  updateUserProfile,
+  getUser
 };

@@ -9,6 +9,17 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function Favorites() {
   const navigate = useNavigate();
+  const handleBack = () => {
+    try {
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+    } catch (e) {
+      // ignore
+    }
+    navigate(-1);
+  };
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   const [favorites, setFavorites] = useState<FavoriteAnime[]>([]);
@@ -77,11 +88,19 @@ export default function Favorites() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold gradient-text mb-2">Избранное</h1>
-        <p className="text-muted-foreground">
-          Ваши любимые аниме ({favorites.length})
-        </p>
+      <div className="mb-8 grid grid-cols-3 items-center">
+        <div className="text-left">
+          <Button variant="ghost" size="sm" onClick={handleBack} aria-label="Назад">← Назад</Button>
+        </div>
+
+        <div className="text-center">
+          <h1 className="text-3xl font-bold gradient-text mb-2">Избранное</h1>
+          <p className="text-muted-foreground">
+            Ваши любимые аниме ({favorites.length})
+          </p>
+        </div>
+
+        <div />
       </div>
 
       {isLoading ? (

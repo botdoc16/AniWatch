@@ -20,27 +20,32 @@ export const userLevelService = {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = 'Ошибка обновления опыта';
+      const errorText = await response.text().catch(() => '');
 
       try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.detail) {
-          errorMessage += `: ${errorData.detail}`;
-        }
-      } catch (e) {
-        if (errorText) {
-          errorMessage += `: ${errorText}`;
-        }
+        const parsed = JSON.parse(errorText);
+        console.warn('watchEpisode non-ok response', { status: response.status, parsed });
+      } catch {
+        console.warn('watchEpisode non-ok response', { status: response.status, errorText });
       }
 
+      if (response.status === 404 || response.status === 401) {
+        // Сервер не поддерживает эндпоинт или нет доступа — возвращаем null-значение
+        console.warn('watchEpisode endpoint not available or unauthorized', { status: response.status });
+        return null as any;
+      }
+
+      let errorMessage = 'Ошибка обновления опыта';
+      if (errorText) errorMessage += `: ${errorText}`;
       throw new Error(errorMessage);
     }
 
-    return response.json();
+    const data = await response.json();
+    console.debug('watchEpisode success', data);
+    return data;
   },
 
-  async getUserLevel(): Promise<UserLevel> {
+  async getUserLevel(): Promise<UserLevel | null> {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Не авторизован');
 
@@ -56,27 +61,17 @@ export const userLevelService = {
 
     try {
       if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = 'Ошибка получения уровня пользователя';
+        const errorText = await response.text().catch(() => '');
 
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.detail) {
-            errorMessage += `: ${errorData.detail}`;
-          }
-        } catch (e) {
-          // Если не удалось распарсить JSON, используем текст как есть
-          if (errorText) {
-            errorMessage += `: ${errorText}`;
-          }
+        // Если endpoint не найден или пользователь не авторизован — возвращаем null
+        if (response.status === 404 || response.status === 401) {
+          console.warn('User level endpoint returned', response.status, { errorText });
+          return null as any;
         }
 
-        console.error('Error response:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText
-        });
-
+        let errorMessage = 'Ошибка получения уровня пользователя';
+        if (errorText) errorMessage += `: ${errorText}`;
+        console.error('Error response:', { status: response.status, statusText: response.statusText, errorText });
         throw new Error(errorMessage);
       }
 

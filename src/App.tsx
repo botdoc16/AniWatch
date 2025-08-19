@@ -11,6 +11,7 @@ import Catalog from "./pages/Catalog";
 import Profile from "./pages/Profile";
 import AnimeDetails from "./pages/AnimeDetails";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ function App() {
                 <Route path="/favorites" element={<Favorites />} />
                 <Route path="/catalog" element={<Catalog />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/anime/:id" element={<AnimeDetails />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
